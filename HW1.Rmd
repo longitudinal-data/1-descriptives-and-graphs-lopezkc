@@ -1,0 +1,151 @@
+---
+title: "HW1.1"
+author: "Kat Lopez"
+date: "September 5, 2017"
+output: html_document
+---
+
+```{r}
+PDS <- read.csv("~/Dropbox/3rd Fall/Longitudinal data analysis/PDS_II_LI_reduced_09_01_17.csv") # wide format
+View(PDS)
+library("dplyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("tidyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("ggplot2", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("plyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+
+# 1) Move your data into a long format and a wide format. Did you have any specific challenges that you encountered? If so, discuss them.
+PDS <- rename(PDS, c("Subid_fMRI"= "ID"))
+PDS <- rename(PDS, c("CON_CON_WAVE1"= "CONCON_WAVE1"))
+PDS <- rename(PDS, c("CON_CON_WAVE2"= "CONCON_WAVE2"))
+PDS <- rename(PDS, c("CON_CON_WAVE3"= "CONCON_WAVE3"))
+PDS <- rename(PDS, c("CON_FPN_WAVE1"= "CONFPN_WAVE1"))
+PDS <- rename(PDS, c("CON_FPN_WAVE2"= "CONFPN_WAVE2"))
+PDS <- rename(PDS, c("CON_FPN_WAVE3"= "CONFPN_WAVE3"))
+wide_to_long <- PDS %>%
+gather(-ID, key = "Timepoint", value = "Value") %>%
+separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
+select(-omit) %>%
+spread(key = var, value = Value)
+wide_to_long <- rename(wide_to_long, c("Ageage" = "AgeatWave"))
+wide_to_long
+View(wide_to_long)
+
+# Challanges I encountered was spreading my Connectivity variables (CONCON, CONFPN) into two seperate columns. Changing the variables names so that they mateched in terms of length allowed me to use "sep=" to seperate then spread them. 
+
+```
+
+
+```{r}
+# 2) Create a wave variable and date variable (if applicable).
+ # I already had three wave variables and I created DOB for each subject as my date variable 
+Agenow=sample(seq(as.Date('2000/01/01'), as.Date('2012/01/01'), by='day'), 136)
+DOBDOB_WAVE1=Agenow
+PDS1=cbind(PDS, DOBDOB_WAVE1)
+
+wide_to_long_new <- PDS1 %>%
+gather(-DOBDOB_WAVE1,-ID, key = "Timepoint", value = "Value") %>%
+separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
+select(-omit) %>%
+spread(key = var, value = Value)
+wide_to_long_new
+View(wide_to_long_new)
+```
+
+```{r}
+# 3) What is your sample size for each wave of assessment?
+#Wave1= 99
+#Wave2= 128
+#Wave3= 119
+aggregate(CONCON ~ wave, wide_to_long, function(x) sum(!is.na(x)))
+aggregate(CONCON ~ wave, wide_to_long, function(x) {sum(length(x))}, na.action=na.omit)
+
+```
+
+```{r}
+# 4) Take the date variable and convert it to a different date format such as time in study or age (if appropriate). What scale is most suitable for your analyses? (weeks/months/years?)
+ 
+# I took the DOB variables I created above and used the age_calc function (below) to calculate current Age in months. For my research questions, I think it makes me sense to think of age in years, although ages in months is commonly used in developmental neuroimaging studies, so I think I could use both. 
+
+age_calc <- function(dob, enddate=Sys.Date(), units='months'){
+if (!inherits(dob, "Date") | !inherits(enddate, "Date"))
+stop("Both dob and enddate must be Date class objects")
+start <- as.POSIXlt(dob)
+end <- as.POSIXlt(enddate)
+years <- end$year - start$year
+if(units=='years'){
+result <- ifelse((end$mon < start$mon) |
+((end$mon == start$mon) & (end$mday < start$mday)),
+years - 1, years)
+}else if(units=='months'){
+months <- (years-1) * 12
+result <- months + start$mon
+}else if(units=='days'){
+result <- difftime(end, start, units='days')
+}else{
+stop("Unrecognized units. Please choose years, months, or days.")
+}
+return(result)
+}
+
+wide_to_long_new$AgeNowMonths= age_calc(as.Date(wide_to_long_new$DOBDOB_WAVE1, "%Y%m%d"), units = "months")
+View(wide_to_long_new)
+
+
+```
+
+
+```{r}
+# 5) Graph your data using the different time metrics, fitting individual curves for each person.
+
+#CON
+s = ggplot(wide_to_long_new,aes(x = Ageage, y = CONCON, group = ID)) + geom_line() + aes(colour = factor(ID)) + guides(colour=FALSE)
+s
+r = ggplot(wide_to_long_new,aes(x = wave, y = CONCON, group = ID)) + geom_line() + aes(colour = factor(ID)) + guides(colour=FALSE)
+r
+t = ggplot(wide_to_long_new,aes(x = AgeNowMonths , y = CONCON, group = ID)) + geom_line() + aes(colour = factor(ID)) + guides(colour=FALSE)
+t = ggplot(wide_to_long_new,aes(x = AgeNowMonths , y = CONCON, group = ID)) + geom_line() + aes(colour = factor(ID)) + guides(colour=FALSE)
+t
+
+#FPN
+s1 = ggplot(wide_to_long_new,aes(x = Ageage, y = CONFPN, group = ID)) + geom_line() + aes(colour = factor(ID)) + guides(colour=FALSE)
+s1
+r1 = ggplot(wide_to_long_new,aes(x = wave, y = CONFPN, group = ID)) + geom_line() + aes(colour = factor(ID)) + guides(colour=FALSE)
+r1
+t1 = ggplot(wide_to_long_new,aes(x = AgeNowMonths , y = CONFPN, group = ID)) + geom_line() + aes(colour = factor(ID)) + guides(colour=FALSE)
+t1
+
+```
+
+```{r}
+
+# 6) Create an overall average trend of your data (split up into groups if appropriate). Attempt to color your individual data points and/or shade different lines (highlight some particiapnts, highlight the average trend line but not the individual level lines)
+
+# Average trend graphs for CON-CON connectivity 
+d1= ggplot(wide_to_long_new, aes (x= Ageage , y= CONCON)) + geom_point() + stat_smooth() + labs (x= "Age (Years)", y= "CON-CON connectivity")
+d1
+e1= ggplot(wide_to_long_new, aes (x=AgeNowMonths, y=CONCON )) + geom_point() + stat_smooth() + labs (x= "Age (Months)", y= "CON-CON connectivity ")
+e1
+g1= ggplot(wide_to_long_new, aes (x= wave , y=CONCON )) + geom_point() + stat_smooth() + labs (x= "Wave", y= "CON-CON connectivity")
+g1
+#not sure it makes sense to look at wave
+
+
+# Average trend graph for CON-FPN connectivity
+d2= ggplot(wide_to_long_new, aes (x= Ageage, y= CONFPN )) + geom_point() + stat_smooth() + labs (x= "Age (Years)", y= " CON-FPN connectivity ")
+d2
+e2= ggplot(wide_to_long_new, aes (x= AgeNowMonths , y= CONFPN )) + geom_point() + stat_smooth() + labs (x= "Age (Months)", y= " CON-FPN connectivity ")
+e2
+
+
+
+```
+
+```{r}
+# 7) Look at the correlations of your DV across time
+
+q= data.frame(wide_to_long_new$CONCON, wide_to_long_new$CONFPN, wide_to_long_new$Ageage)
+cor(q, use = "complete.obs", method = "pearson")
+q= data.frame(wide_to_long_new$CONCON, wide_to_long_new$CONFPN, wide_to_long_new$AgeNowMonths)
+cor(q, use = "complete.obs", method = "pearson")
+
+```
