@@ -21,6 +21,9 @@ PDS <- rename(PDS, c("CON_CON_WAVE3"= "CONCON_WAVE3"))
 PDS <- rename(PDS, c("CON_FPN_WAVE1"= "CONFPN_WAVE1"))
 PDS <- rename(PDS, c("CON_FPN_WAVE2"= "CONFPN_WAVE2"))
 PDS <- rename(PDS, c("CON_FPN_WAVE3"= "CONFPN_WAVE3"))
+View(PDS)
+
+
 wide_to_long <- PDS %>%
 gather(-ID, key = "Timepoint", value = "Value") %>%
 separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
