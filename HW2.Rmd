@@ -99,7 +99,7 @@ linear_MLM= data.frame("Type"= c("linear", "MLM"), "mean"= c(mean_linearresidual
 
 ResidPlot= ggplot(linear_MLM, aes (Type, mean)) + geom_col() +geom_errorbar(aes(ymin= mean-SD, ymax= mean +SD), width= 0.2)
 ResidPlot+ labs(y= "mean Residual", x= "Model Type")
-
+#mean residuals appear similar, with MLM showing greater variance. 
 ```
 
 
