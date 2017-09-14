@@ -1,0 +1,162 @@
+---
+title: "HW2"
+author: "Kat Lopez"
+date: "9/13/2017"
+output: html_document
+---
+
+Data & Libraries
+```{r}
+library("dplyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("tidyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("ggplot2", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("plyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("tidyverse", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("lme4", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("broom", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+
+```
+
+Prepping data
+```{r}
+PDS <- read.csv("~/Dropbox/3rd Fall/Longitudinal data analysis/PDS_II_LI_reduced_09_01_17.csv") # wide format
+
+## converts from wide to long
+PDS <- rename(PDS, c("Subid_fMRI"= "ID"))
+PDS <- rename(PDS, c("CON_CON_WAVE1"= "CONCON_WAVE1"))
+PDS <- rename(PDS, c("CON_CON_WAVE2"= "CONCON_WAVE2"))
+PDS <- rename(PDS, c("CON_CON_WAVE3"= "CONCON_WAVE3"))
+PDS <- rename(PDS, c("CON_FPN_WAVE1"= "CONFPN_WAVE1"))
+PDS <- rename(PDS, c("CON_FPN_WAVE2"= "CONFPN_WAVE2"))
+PDS <- rename(PDS, c("CON_FPN_WAVE3"= "CONFPN_WAVE3"))
+wide_to_long <- PDS %>%
+gather(-ID, key = "Timepoint", value = "Value") %>%
+separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
+select(-omit) %>%
+spread(key = var, value = Value)
+wide_to_long <- rename(wide_to_long, c("Ageage" = "AgeatWave"))
+wide_to_long
+
+## randomly created DOB and added to dataframe
+Agenow=sample(seq(as.Date('2000/01/01'), as.Date('2012/01/01'), by='day'), 136)
+DOBDOB_WAVE1=Agenow
+PDS1=cbind(PDS, DOBDOB_WAVE1)
+
+wide_to_long_new <- PDS1 %>%
+gather(-DOBDOB_WAVE1,-ID, key = "Timepoint", value = "Value") %>%
+separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
+select(-omit) %>%
+spread(key = var, value = Value)
+wide_to_long_new
+View(wide_to_long_new)
+```
+
+### Homework Questions ###
+
+# 1.Run linear models on all of your subjects (a basic regression). What is the average intercept, the average slope
+```{r}
+regressions_CONCON= lm (CONCON ~ Ageage, data = wide_to_long_new)
+  summary(regressions_CONCON)
+anova(regressions_CONCON)
+# Average intercept is 0.252861 for connectivity between CON and CON networks of all individuals across time
+# Average slope is 0.003949 of CON-CON 
+
+regressions_CONFPN= lm (CONFPN ~ Ageage, data = wide_to_long_new)
+  summary(regressions_CONFPN)
+anova(regressions_CONFPN)
+# Average intercept is -0.009111 for connectivity between CON and FPN networks of all individuals across time
+# Average slope is -0.001780
+```
+
+
+
+2. Now run a mlm/lmer model with only a random intercept. What is the ICC? What does residual variance look like compared to linear model? Create a graph to show this effect.
+
+```{r}
+model1= lmer(CONCON ~ 1 + (1 | ID), data = wide_to_long_new)
+summary(model1)
+fixef(model1)
+## Fixed Effects (intercept) = 0.297052
+## Residual Variance of MLM (Variance left over for each person)= 0.005125
+## Residual standard error for linear model = 0.08346 on 344 degrees of freedom
+## Overall, Residual Variance of the MLM is slighly smaller than the Residual Residual standard error for linear model 
+
+## calculating ICC= 0.269839
+ICC= 0.001894/ (0.001894+ 0.005125)
+ICC
+
+
+# graphing mlm with only a random intercept. 
+linearresidual= abs(broom::augment(regressions_CONCON)[,c(4)])
+mean_linearresidual= mean(linearresidual)
+SD_linearresidual= sd(linearresidual)
+
+MLMresidual= abs(broom::augment(model1)[,c(4)])
+mean_MLMresidual= mean(MLMresidual)
+SD_MLMresidual= sd(MLMresidual)
+
+linear_MLM= data.frame("Type"= c("linear", "MLM"), "mean"= c(mean_linearresidual, mean_MLMresidual), "SD"= c(SD_linearresidual, SD_MLMresidual))
+
+ResidPlot= ggplot(linear_MLM, aes (Type, mean)) + geom_col() +geom_errorbar(aes(ymin= mean-SD, ymax= mean +SD), width= 0.2)
+ResidPlot+ labs(y= "mean Residual", x= "Model Type")
+
+```
+
+
+
+# 3. Introduce a fixed slope term. What is the difference in terms of the fixed effects estimates between this estimate and the previous? Of the residual standard error? Create a graph to show both fixed effects estimates and the CIs around them.
+
+
+
+# 4. Run an additional model with a random slope. How does this change compare to the previous model? Should you keep the random slope or not?
+
+
+
+# 5. Interpret the correlation between the slope and the intercept.
+
+
+
+# 6. Create a density plot of the random effects from your final model.
+
+
+
+# 7. Create a catepilar plot of the random effects. Is there any person that seems odd in terms of a large standard errors around intercept and slope estimates?
+
+
+
+
+# 8. Create a plot of the trajectory, along with a spaghetti plot of each person’s individual slope. Set the alpha level (transparency) on the individual slopes to make them easier to see.
+
+
+
+
+
+# 9. Create a plot of the trajectory, along with a spagehtti plot of each person’s individual slope. Set the alpha level (transperancy) on the individual slopes to make them easier to see.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
