@@ -139,8 +139,10 @@ d2
 e2= ggplot(wide_to_long_new, aes (x= AgeNowMonths , y= CONFPN )) + geom_point() + stat_smooth() + labs (x= "Age (Months)", y= " CON-FPN connectivity ")
 e2
 
-
-
+example= wide_to_long_new %>%
+  filter(ID == "L055")
+e3= ggplot(example, aes(x=Ageage,y= CONFPN, group= ID ))+  geom_point() + stat_smooth(method = "lm")
+e3
 ```
 
 ```{r}
