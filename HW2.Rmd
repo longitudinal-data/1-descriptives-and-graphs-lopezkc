@@ -70,7 +70,7 @@ anova(regressions_CONFPN)
 
 
 
-2. Now run a mlm/lmer model with only a random intercept. What is the ICC? What does residual variance look like compared to linear model? Create a graph to show this effect.
+#2. Now run a mlm/lmer model with only a random intercept. What is the ICC? What does residual variance look like compared to linear model? Create a graph to show this effect.
 
 ```{r}
 model1= lmer(CONCON ~ 1 + (1 | ID), data = wide_to_long_new)
