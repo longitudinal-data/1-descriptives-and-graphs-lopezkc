@@ -14,6 +14,7 @@ library("plyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/
 library("tidyverse", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
 library("lme4", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
 library("broom", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("merTools", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
 
 ```
 
@@ -73,6 +74,8 @@ anova(regressions_CONFPN)
 #2. Now run a mlm/lmer model with only a random intercept. What is the ICC? What does residual variance look like compared to linear model? Create a graph to show this effect.
 
 ```{r}
+## For CON-CON connectivity
+
 model1= lmer(CONCON ~ 1 + (1 | ID), data = wide_to_long_new)
 summary(model1)
 fixef(model1)
@@ -100,28 +103,160 @@ linear_MLM= data.frame("Type"= c("linear", "MLM"), "mean"= c(mean_linearresidual
 ResidPlot= ggplot(linear_MLM, aes (Type, mean)) + geom_col() +geom_errorbar(aes(ymin= mean-SD, ymax= mean +SD), width= 0.2)
 ResidPlot+ labs(y= "mean Residual", x= "Model Type")
 #mean residuals appear similar, with MLM showing greater variance. 
+
+## For CON-FPN connectivity 
+
+model2= lmer(CONFPN ~ 1 + (1 | ID), data = wide_to_long_new)
+summary(model2)
+fixef(model2)
+## Fixed Effects (intercept) = -0.02938087
+## Residual Variance of MLM (Variance left over for each person)= 0.0019769
+## Residual standard error for linear model = 0.05152 on 344 degrees of freedom
+## For CON-FPN connectivity, relative to CONCON connectivity, Residual Variance of the MLM is much smaller than the Residual Residual standard error for linear model 
+
+## calculating ICC= 0.2549559
+ICC2= 0.0006765/ (0.0006765+ 0.0019769)
+ICC2
+
+
+# graphing mlm with only a random intercept. 
+linearresidual2= abs(broom::augment(regressions_CONFNP)[,c(4)])
+mean_linearresidual2= mean(linearresidual2)
+SD_linearresidual2= sd(linearresidual2)
+
+MLMresidual2= abs(broom::augment(model2)[,c(4)])
+mean_MLMresidual2= mean(MLMresidual2)
+SD_MLMresidual2= sd(MLMresidual2)
+
+linear_MLM2= data.frame("Type"= c("linear", "MLM"), "mean"= c(mean_linearresidual2, mean_MLMresidual2), "SD"= c(SD_linearresidual2, SD_MLMresidual2))
+
+ResidPlot2= ggplot(linear_MLM2, aes (Type, mean)) + geom_col() +geom_errorbar(aes(ymin= mean-SD, ymax= mean +SD), width= 0.2)
+ResidPlot2 + labs(y= "mean Residual", x= "Model Type")
+#mean residuals for the MLM is considerably smaller with wider variance than the linear model. 
+
 ```
 
 
 
 # 3. Introduce a fixed slope term. What is the difference in terms of the fixed effects estimates between this estimate and the previous? Of the residual standard error? Create a graph to show both fixed effects estimates and the CIs around them.
 
+```{r}
+## FOR CONCON
+fixed_slope1= lmer(CONCON ~ 1 + Ageage + (1 | ID), data = wide_to_long_new)
+summary(fixed_slope1)
+# Intercept = 0.245952
+# Slope = 0.004537
+# Residual= 0.005078
+
+# Both the fixed effect and the residual standard errors decrease from the previous model; fixed effect from 0.297052 to 0.245952 and the standard error from 0.005125 to 0.005078
+
+#################
+CI_CONCON= data.frame(confint(fixed_slope1, level = .95) [3:4,])
+CI_CONCON
+summary=tidy(fixed_slope1)
+CI_graph
+###################
+
+
+## FOR CONFPN
+fixed_slope2= lmer(CONFPN ~ 1 + Ageage + (1 | ID), data = wide_to_long_new)
+summary(fixed_slope2)
+# Intercept = -0.0195536
+# Slope = -0.0008725
+# Residual= 0.0019867
+
+# Fixed effects of the intercept increased from -0.029381 in the previous model to -0.0195536 in the current model. Residual variance also increased slightly from 0.0019769 to 0.0019867
+
+
+CI_CONCFN= data.frame(confint(fixed_slope1, level = .95) [3:4,])
+CI_CONCFN
+
+```
 
 
 # 4. Run an additional model with a random slope. How does this change compare to the previous model? Should you keep the random slope or not?
 
+```{r}
+## FOR CONCON
+randomslope1= lmer(CONCON~ 1 + Ageage+ (Ageage | ID), data = wide_to_long_new)
+summary (randomslope1)
 
+#previous model
+# Intercept = 0.245952
+# Slope = 0.004537
+# Residual= 0.005078
+
+#model with random slope
+# Intercept = 0.246968
+# Slope = 0.004462
+# Residual= 5.037e-03
+
+# Residual variance decreased so I should retain the random slope
+
+
+
+## FOR CONFPN
+randomslope2= lmer(CONFPN~ 1 + Ageage+ (Ageage | ID), data = wide_to_long_new)
+summary (randomslope2)
+
+# for previous model
+# Intercept = -0.0195536
+# Slope = -0.0008725
+# Residual= 0.0019867
+
+# for current model with random slope
+# Intercept = -0.0188266
+# Slope = -0.0009184
+# Residual= 1.959e-03
+
+# Residual variance decreased so I should retain the random slope
+
+
+```
 
 # 5. Interpret the correlation between the slope and the intercept.
+
+A -0.987 correlation represents an average negative relationship between connectivity strength and age, such that connectivity becomes increasinly negative with greater age. 
 
 
 
 # 6. Create a density plot of the random effects from your final model.
+```{r}
 
+# FOR CONCON
+FEsim(randomslope1)
+re.sim= REsim(randomslope1)
+head(re.sim)
+CONCON_density= re.sim %>%
+  filter(term == "(Intercept)")
+ggplot(CONCON_density, aes(mean)) + geom_density()
+
+
+
+#FOR CONFPN
+
+FEsim(randomslope2)
+re.sim2= REsim(randomslope2)
+head(re.sim2)
+CONFPN_density= re.sim2 %>%
+  filter(term == "(Intercept)")
+ggplot(CONFPN_density, aes(mean)) + geom_density()
+
+```
 
 
 # 7. Create a catepilar plot of the random effects. Is there any person that seems odd in terms of a large standard errors around intercept and slope estimates?
 
+```{r}
+# FOR CONCON
+p1= plotREsim(re.sim)
+p1
+
+#FOR CONFPN 
+p2= plotREsim(re.sim2)
+p2
+
+```
 
 
 
