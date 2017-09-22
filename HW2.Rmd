@@ -21,6 +21,8 @@ library("merTools", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resour
 Prepping data
 ```{r}
 PDS <- read.csv("~/Dropbox/3rd Fall/Longitudinal data analysis/PDS_II_LI_reduced_09_01_17.csv") # wide format
+View(PDS)
+
 
 ## converts from wide to long
 PDS <- rename(PDS, c("Subid_fMRI"= "ID"))
@@ -30,59 +32,70 @@ PDS <- rename(PDS, c("CON_CON_WAVE3"= "CONCON_WAVE3"))
 PDS <- rename(PDS, c("CON_FPN_WAVE1"= "CONFPN_WAVE1"))
 PDS <- rename(PDS, c("CON_FPN_WAVE2"= "CONFPN_WAVE2"))
 PDS <- rename(PDS, c("CON_FPN_WAVE3"= "CONFPN_WAVE3"))
+View(PDS)
 wide_to_long <- PDS %>%
 gather(-ID, key = "Timepoint", value = "Value") %>%
 separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
 select(-omit) %>%
 spread(key = var, value = Value)
+
 wide_to_long <- rename(wide_to_long, c("Ageage" = "AgeatWave"))
-wide_to_long
+View(wide_to_long)
 
 ## randomly created DOB and added to dataframe
 Agenow=sample(seq(as.Date('2000/01/01'), as.Date('2012/01/01'), by='day'), 136)
 DOBDOB_WAVE1=Agenow
-PDS1=cbind(PDS, DOBDOB_WAVE1)
+
+#Centers age to be able to interpret 0
+
+Agecen_WAVE1= PDS$Ageage_WAVE1- mean(PDS1$Ageage_WAVE1)
+Agecen_WAVE2= PDS$Ageage_WAVE2- mean(PDS1$Ageage_WAVE2, na.rm=TRUE)
+Agecen_WAVE3= PDS$Ageage_WAVE3- mean(PDS1$Ageage_WAVE3)
+PDS1=cbind(PDS, Agecen_WAVE1, Agecen_WAVE2, Agecen_WAVE3, DOBDOB_WAVE1)
+PDS1
+View(PDS1)
+
+
 
 wide_to_long_new <- PDS1 %>%
 gather(-DOBDOB_WAVE1,-ID, key = "Timepoint", value = "Value") %>%
 separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
-select(-omit) %>%
 spread(key = var, value = Value)
 wide_to_long_new
 View(wide_to_long_new)
+
+
 ```
 
 ### Homework Questions ###
 
 # 1.Run linear models on all of your subjects (a basic regression). What is the average intercept, the average slope
 ```{r}
-regressions_CONCON= lm (CONCON ~ Ageage, data = wide_to_long_new)
+regressions_CONCON= lm (CONCON ~ Agecen, data = wide_to_long_new)
   summary(regressions_CONCON)
 anova(regressions_CONCON)
-# Average intercept is 0.252861 for connectivity between CON and CON networks of all individuals across time
-# Average slope is 0.003949 of CON-CON 
+# Average intercept is 0.297377 for connectivity between CON and CON networks of all individuals across time
+# Average slope is 0.004034 of CON-CON 
 
-regressions_CONFPN= lm (CONFPN ~ Ageage, data = wide_to_long_new)
+regressions_CONFPN= lm (CONFPN ~ Agecen, data = wide_to_long_new)
   summary(regressions_CONFPN)
 anova(regressions_CONFPN)
-# Average intercept is -0.009111 for connectivity between CON and FPN networks of all individuals across time
-# Average slope is -0.001780
+# Average intercept is -0.029210 for connectivity between CON and FPN networks of all individuals across time
+# Average slope is -0.003149
 ```
-
-
 
 #2. Now run a mlm/lmer model with only a random intercept. What is the ICC? What does residual variance look like compared to linear model? Create a graph to show this effect.
 
 ```{r}
 ## For CON-CON connectivity
 
-model1= lmer(CONCON ~ 1 + (1 | ID), data = wide_to_long_new)
-summary(model1)
-fixef(model1)
+Random_intercept_only= lmer(CONCON ~ 1 + (1 | ID), data = wide_to_long_new)
+## predicts CON-CON connectivity from only the intercept but allows the intercept to vary across IDs
+summary(Random_intercept_only)
 ## Fixed Effects (intercept) = 0.297052
-## Residual Variance of MLM (Variance left over for each person)= 0.005125
-## Residual standard error for linear model = 0.08346 on 344 degrees of freedom
-## Overall, Residual Variance of the MLM is slighly smaller than the Residual Residual standard error for linear model 
+## Residual Variance of MLM (variability of the intercept)= 0.005125
+## Residual standard error for linear model = 0.08346 
+### Overall, Residual Variance of the MLM is  smaller than the Residual standard error for linear model 
 
 ## calculating ICC= 0.269839
 ICC= 0.001894/ (0.001894+ 0.005125)
@@ -94,7 +107,7 @@ linearresidual= abs(broom::augment(regressions_CONCON)[,c(4)])
 mean_linearresidual= mean(linearresidual)
 SD_linearresidual= sd(linearresidual)
 
-MLMresidual= abs(broom::augment(model1)[,c(4)])
+MLMresidual= abs(broom::augment(Random_intercept_only)[,c(4)])
 mean_MLMresidual= mean(MLMresidual)
 SD_MLMresidual= sd(MLMresidual)
 
@@ -108,11 +121,10 @@ ResidPlot+ labs(y= "mean Residual", x= "Model Type")
 
 model2= lmer(CONFPN ~ 1 + (1 | ID), data = wide_to_long_new)
 summary(model2)
-fixef(model2)
 ## Fixed Effects (intercept) = -0.02938087
 ## Residual Variance of MLM (Variance left over for each person)= 0.0019769
 ## Residual standard error for linear model = 0.05152 on 344 degrees of freedom
-## For CON-FPN connectivity, relative to CONCON connectivity, Residual Variance of the MLM is much smaller than the Residual Residual standard error for linear model 
+## For CON-FPN connectivity, relative to CONCON connectivity, Residual Variance of the MLM is much smaller than the  Residual standard error for linear model 
 
 ## calculating ICC= 0.2549559
 ICC2= 0.0006765/ (0.0006765+ 0.0019769)
@@ -139,37 +151,48 @@ ResidPlot2 + labs(y= "mean Residual", x= "Model Type")
 
 
 # 3. Introduce a fixed slope term. What is the difference in terms of the fixed effects estimates between this estimate and the previous? Of the residual standard error? Create a graph to show both fixed effects estimates and the CIs around them.
-
 ```{r}
 ## FOR CONCON
-fixed_slope1= lmer(CONCON ~ 1 + Ageage + (1 | ID), data = wide_to_long_new)
+fixed_slope1= lmer(CONCON ~ 1 + Agecen + (1 | ID), data = wide_to_long_new)
 summary(fixed_slope1)
-# Intercept = 0.245952
-# Slope = 0.004537
-# Residual= 0.005078
 
-# Both the fixed effect and the residual standard errors decrease from the previous model; fixed effect from 0.297052 to 0.245952 and the standard error from 0.005125 to 0.005078
+# fixed effect Intercept = 0.297126
+# fixed effect Slope = 0.003605
+# Residual error= 0.005131
 
-#################
+# Both the fixed effect intercept and the residual standard errors increased from the previous model; fixed effect from 0.297052 to 0.297126 and the standard error from 0.005125 to 0.005131
+
+confint(fixed_slope1, level = .95)
 CI_CONCON= data.frame(confint(fixed_slope1, level = .95) [3:4,])
 CI_CONCON
-summary=tidy(fixed_slope1)
+CI_CONCON$FE= fixef(fixed_slope1)
+CI_CONCON_tidy=tidy(fixed_slope1)
+CI_CONCON_tidy
+dataframe1= data.frame("FixedEffect" = c ("intercept", "slope"),"Mean"= c(CI_CONCON[1,3], CI_CONCON[2,3]), "LowerCI"= c(CI_CONCON[1,1], CI_CONCON[2,1]), "UpperCI"= c(CI_CONCON[1,2], CI_CONCON[2,2]))
+CI_graph= ggplot(dataframe1, aes(FixedEffect, Mean))+ geom_point() + geom_errorbar(aes(ymin= LowerCI, ymax= UpperCI), width=0.5)
 CI_graph
-###################
+
 
 
 ## FOR CONFPN
-fixed_slope2= lmer(CONFPN ~ 1 + Ageage + (1 | ID), data = wide_to_long_new)
+fixed_slope2= lmer(CONFPN ~ 1 + Agecen + (1 | ID), data = wide_to_long_new)
 summary(fixed_slope2)
-# Intercept = -0.0195536
-# Slope = -0.0008725
-# Residual= 0.0019867
+# fixed effect Intercept = -0.029438
+# fixed effect Slope = -0.002792
+# Residual error =  0.0019780
 
-# Fixed effects of the intercept increased from -0.029381 in the previous model to -0.0195536 in the current model. Residual variance also increased slightly from 0.0019769 to 0.0019867
+# Fixed effect intercept decreased from -0.029381 in the previous model to -0.029438 in the current model. Residual variance also increased slightly from 0.0019769 to 0.0019780
 
 
-CI_CONCFN= data.frame(confint(fixed_slope1, level = .95) [3:4,])
-CI_CONCFN
+confint(fixed_slope2, level = .95)
+CI_CONFPN= data.frame(confint(fixed_slope2, level = .95) [3:4,])
+CI_CONFPN
+CI_CONFPN$FE= fixef(fixed_slope2)
+CI_CONFPN_tidy=tidy(fixed_slope2)
+CI_CONFPN_tidy
+dataframe2= data.frame("FixedEffect" = c ("intercept", "slope"),"Mean"= c(CI_CONFPN[1,3], CI_CONFPN[2,3]), "LowerCI"= c(CI_CONFPN[1,1], CI_CONFPN[2,1]), "UpperCI"= c(CI_CONFPN[1,2], CI_CONFPN[2,2]))
+CI_graph2= ggplot(dataframe2, aes(FixedEffect, Mean))+ geom_point() + geom_errorbar(aes(ymin= LowerCI, ymax= UpperCI), width=0.5)
+CI_graph2
 
 ```
 
@@ -178,45 +201,49 @@ CI_CONCFN
 
 ```{r}
 ## FOR CONCON
-randomslope1= lmer(CONCON~ 1 + Ageage+ (Ageage | ID), data = wide_to_long_new)
+randomslope1= lmer(CONCON~ 1 + Agecen+ (Agecen | ID), data = wide_to_long_new)
 summary (randomslope1)
 
 #previous model
-# Intercept = 0.245952
-# Slope = 0.004537
-# Residual= 0.005078
+# fixed effect Intercept = 0.297126
+# fixed effect Slope = 0.003605
+# Residual error= 0.005131
+
 
 #model with random slope
-# Intercept = 0.246968
-# Slope = 0.004462
-# Residual= 5.037e-03
+# fixed effect Intercept = 0.296943
+# fixed effect Slope = 0.003162
+# Residual error = 0.005135
+# random effects of slope= 5.511e-05
 
-# Residual variance decreased so I should retain the random slope
+# Residual variance error stays nearly the same when introducing the random slope. It wouldnt make a difference to keep or remove the random slope.
 
 
 
 ## FOR CONFPN
-randomslope2= lmer(CONFPN~ 1 + Ageage+ (Ageage | ID), data = wide_to_long_new)
+randomslope2= lmer(CONFPN~ 1 + Agecen+ (Agecen | ID), data = wide_to_long_new)
 summary (randomslope2)
 
 # for previous model
-# Intercept = -0.0195536
-# Slope = -0.0008725
-# Residual= 0.0019867
+# fixed effect Intercept = -0.029438
+# fixed effect Slope = -0.002792
+# Residual error =  0.0019780
 
-# for current model with random slope
-# Intercept = -0.0188266
-# Slope = -0.0009184
-# Residual= 1.959e-03
 
-# Residual variance decreased so I should retain the random slope
+# model with random slope
+# fixed effect Intercept = -0.029639
+# fixed effect Slope = -0.002333
+# Residual= 0.0019683
+# random slope of age= 50.0001159
+
+# Residual variance decreased ( not by much)--I should retain the random slope
 
 
 ```
 
 # 5. Interpret the correlation between the slope and the intercept.
 
-A -0.987 correlation represents an average negative relationship between connectivity strength and age, such that connectivity becomes increasinly negative with greater age. 
+A 0.163 correlation represents an average (and low) positive relationship between connectivity strength and age, such that connectivity becomes increasingly positive as a function of age. 
 
 
 
@@ -224,52 +251,73 @@ A -0.987 correlation represents an average negative relationship between connect
 ```{r}
 
 # FOR CONCON
-FEsim(randomslope1)
-re.sim= REsim(randomslope1)
-head(re.sim)
-CONCON_density= re.sim %>%
+# random intercept
+CONCON_re.sim_intercept= REsim(Random_intercept_only)
+head(CONCON_re.sim_intercept)
+CONCON_density= CONCON_re.sim_intercept %>%
   filter(term == "(Intercept)")
 ggplot(CONCON_density, aes(mean)) + geom_density()
-
-
+# random slope
+CONCON_re.sim_slope= REsim(randomslope1)
+head(CONCON_re.sim_slope)
+CONCON_density2= CONCON_re.sim_slope %>%
+  filter(term == "(Intercept)")
+ggplot(CONCON_density2, aes(mean)) + geom_density()
 
 #FOR CONFPN
 
-FEsim(randomslope2)
-re.sim2= REsim(randomslope2)
-head(re.sim2)
-CONFPN_density= re.sim2 %>%
+CONFPN_re.sim_intercept= REsim(model2)
+head(CONFPN_re.sim_intercept)
+CONFPN_density= CONFPN_re.sim_intercept %>%
   filter(term == "(Intercept)")
 ggplot(CONFPN_density, aes(mean)) + geom_density()
+# random slope
+CONFPN_re.sim_slope= REsim(randomslope2)
+head(CONFPN_re.sim_slope)
+CONFPN_density2= CONFPN_re.sim_slope %>%
+  filter(term == "(Intercept)")
+ggplot(CONFPN_density2, aes(mean)) + geom_density()
 
 ```
 
 
-# 7. Create a catepilar plot of the random effects. Is there any person that seems odd in terms of a large standard errors around intercept and slope estimates?
-
+# 7. Create a catepilar plot of the random effects. 
+Is there any person that seems odd in terms of a large standard errors around intercept and slope estimates?
 ```{r}
 # FOR CONCON
-p1= plotREsim(re.sim)
+p1= plotREsim(CONCON_re.sim_intercept, labs=T)
 p1
 
+q1=plotREsim(CONCON_re.sim_slope, labs = T)
+q1
+## subjects 261 and 165 seems to have particularly large standard error around both the intercepts and slopes
+
+
 #FOR CONFPN 
-p2= plotREsim(re.sim2)
+p2= plotREsim(CONFPN_re.sim_intercept, labs = T)
 p2
+q2=plotREsim(CONFPN_re.sim_slope, labs = T)
+q2
+
+## subjects 605 has larger standard error around both the intercept. 
 
 ```
 
 
 
 # 8. Create a plot of the trajectory, along with a spaghetti plot of each person’s individual slope. Set the alpha level (transparency) on the individual slopes to make them easier to see.
+```{r}
+# For CONCON
 
+Plot= ggplot(wide_to_long_new, aes(x= Agecen, y= CONCON, group=ID)) +geom_point() +stat_smooth(method = "lm", se= FALSE)
+Plot2= Plot + stat_smooth(data= wide_to_long_new, aes (x=Agecen, y= CONCON, group=1, colour="red"), method="lm", se=FALSE)
+Plot2
 
+# For CONFPN
 
-
-
-# 9. Create a plot of the trajectory, along with a spagehtti plot of each person’s individual slope. Set the alpha level (transperancy) on the individual slopes to make them easier to see.
-
-
-
+Plot1= ggplot(wide_to_long_new, aes(x= Agecen, y= CONFPN, group=ID)) +geom_point() +stat_smooth(method = "lm", se= FALSE)
+Plot3= Plot1 + stat_smooth(data= wide_to_long_new, aes (x=Agecen, y= CONFPN, group=1, colour="red"), method="lm", se=FALSE)
+Plot3
 
 
 
