@@ -1,0 +1,146 @@
+---
+title: "HW3"
+
+author: "Kat Lopez"
+date: "9/27/2017"
+output: word_document
+---
+
+Data & Libraries
+```{r}
+library("dplyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("tidyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("ggplot2", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("plyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("tidyverse", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("lme4", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("broom", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("merTools", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("sjPlot", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+library("sjmisc", lib.loc="/Library/Frameworks/R.framework/Versions/3.2/Resources/library")
+
+```
+
+Prepping data
+```{r}
+PDS <- read.csv("~/Dropbox/3rd Fall/Longitudinal data analysis/PDS_II_LI_reduced_09_01_17.csv") # wide format
+
+## renaming variables
+PDS <- rename(PDS, c("Subid_fMRI"= "ID"))
+PDS <- rename(PDS, c("CON_CON_WAVE1"= "CONCON_WAVE1"))
+PDS <- rename(PDS, c("CON_CON_WAVE2"= "CONCON_WAVE2"))
+PDS <- rename(PDS, c("CON_CON_WAVE3"= "CONCON_WAVE3"))
+PDS <- rename(PDS, c("CON_FPN_WAVE1"= "CONFPN_WAVE1"))
+PDS <- rename(PDS, c("CON_FPN_WAVE2"= "CONFPN_WAVE2"))
+PDS <- rename(PDS, c("CON_FPN_WAVE3"= "CONFPN_WAVE3"))
+
+## randomly created DOB and added to dataframe
+Agenow=sample(seq(as.Date('2000/01/01'), as.Date('2012/01/01'), by='day'), 136)
+DOBDOB_WAVE1=Agenow
+
+#Centers age to be able to interpret 0
+PDS1=PDS
+Agecen_WAVE1= PDS$Ageage_WAVE1- mean(PDS1$Ageage_WAVE1)
+Agecen_WAVE2= PDS$Ageage_WAVE2- mean(PDS1$Ageage_WAVE2, na.rm=TRUE)
+Agecen_WAVE3= PDS$Ageage_WAVE3- mean(PDS1$Ageage_WAVE3)
+PDS1=cbind(PDS, Agecen_WAVE1, Agecen_WAVE2, Agecen_WAVE3, DOBDOB_WAVE1)
+PDS1
+
+## converting to long format
+wide_to_long_new <- PDS1 %>%
+gather(-DOBDOB_WAVE1,-ID,-Sex, key = "Timepoint", value = "Value") %>%
+separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
+spread(key = var, value = Value)
+wide_to_long_new
+```
+
+
+Homework
+
+
+1) Run a series of models using a time-invariant nominal covariate. 
+a) where the time-invariant nominal covariate only predicts the intercept 
+```{r}
+Intercept= lmer(CONCON ~ Sex + Agecen+ (Agecen | ID), data = wide_to_long_new)
+summary(Intercept)
+# A one unit change in sex (from girl(1) to boy (2)) is associated with 0.021185 increase in the intercept of CONCON connectivity. In other words, 0.021185 is the difference in intercept between boys and girls in connectivity.  
+
+
+```
+b) time-invariant nominal covariate predicts both intercept and slope 
+```{r}
+Intercept_slope= lmer(CONCON ~ Sex + Agecen + Sex*Agecen +(Agecen | ID), data = wide_to_long_new)
+summary(Intercept_slope)
+#  A one unit change in centered age is associated with 0.002250 decrease in the slope/rate of CONCON connectivity and represents the difference in slopes. Residual variance does not change in any significant way. 
+
+# 0.002730 is the indirect effect of sex on CONCON connectivity, as a function of centered age change. 
+
+```
+
+c) is rescaled eg centering. For all models, how does your model change from model to model. What is your final model?
+```{r}
+Sex_centered= scale(wide_to_long_new$Sex, center = TRUE, scale = FALSE)
+Intercept_slope_centered= lmer(CONCON ~ Sex_centered + Agecen+ Sex_centered*Agecen  + (Agecen | ID), data = wide_to_long_new)
+summary(Intercept_slope_centered)
+# centering sex did not change the intercept or the residual error . The above model (without centering of sex) is my final model. 
+```
+
+
+2) Introduce a time-invariant continuous covariate and run models a-c from #1.
+
+a) where the covariate (internalizing tendencies) only predicts the intercept 
+```{r}
+
+Intercept2= lmer(CONCON ~ INTERN + Agecen+ (Agecen | ID), data = wide_to_long_new)
+summary(Intercept2)
+
+# A one unit change in interalizing tendencies is  associated with 0.003780 decrease in the intercept of CONCON connectivity. 
+```
+b) predicts both intercept and slope 
+```{r}
+
+Intercept_slope2= lmer(CONCON ~ INTERN + Agecen + INTERN*Agecen +(Agecen | ID), data = wide_to_long_new)
+summary(Intercept_slope2)
+
+#  A one unit change in centered age is associated with 0.0023577 increase in the slope/rate of CONCON connectivity. Residual variance increased sightly. 
+# An interaction effect of internalizing tendencies and centered age is associated with a 0.0008719 slope increase of CONCON connectivity. 
+
+```
+
+c) is rescaled eg centering. 
+```{r}
+Internalizing_centered= scale(wide_to_long_new$INTERN, center = TRUE, scale = FALSE)
+Intercept_slope_centered= lmer(CONCON ~ Internalizing_centered + Agecen+ Internalizing_centered*Agecen + (Agecen | ID), data = wide_to_long_new)
+summary(Intercept_slope_centered)
+
+# Centering internalizing tendencies did not make much of a difference in the starting value of CONCON connectivity; -0.003780 in the previous model to -0.0037966 in the current model. Will retain Intercept_slope2 model for my final model 
+
+```
+
+
+3) Graph both of your final models for the continuous and nominal models above.Calculate confidence intervals around your estimates for your final models
+```{r}
+sjp.lmer(Intercept_slope, type = "pred.fe", vars= c("Agecen", "Sex"), facet.grid = FALSE)
+
+sjp.int(Intercept_slope2, int.term="INTERN*Agecen",  type = "eff")
+```
+
+
+4) Calculate confidence intervals around your estimates for your final models
+
+```{r}
+confint(Intercept_slope, level = .95)
+
+confint(Intercept_slope2, level = .95)
+
+```
+
+5) Include both types of covariates (time invariant and time variant) in a single model. How does your interpretation of parameters change?
+
+```{r}
+full_model= lmer(CONCON ~ Sex + Agecen + INTERN + Sex*Agecen*INTERN +  (Agecen | ID), data = wide_to_long_new)
+summary(full_model)
+
+# Change in Agecen*INTERN interaction is associated with a 0.002127 slope increase in CONCON connectivity across sex (females, males)
+
+```
