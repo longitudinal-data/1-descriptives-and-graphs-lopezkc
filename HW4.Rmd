@@ -1,0 +1,172 @@
+---
+title: "SEM"
+author: "Kat Lopez"
+date: "October 31, 2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r}
+PDS <- read.csv("~/Documents/GitHub/1-descriptives-and-graphs-lopezkc/Connectivity Project/PDS.csv")
+View(PDS)
+library(lavaan)
+library(semTools)
+library("OpenMx", lib.loc="/Library/Frameworks/R.framework/Versions/3.4/Resources/library")
+library(semPlot)
+library(lme4)
+library(car)
+library(tidyr)
+
+```
+
+1) Fit a measurement model to your constructs at one time point. Try out the different types of scaling discussed in class. What changes what stays the same?
+
+```{r setup, include=FALSE}
+
+Model1<- 'Executive_network=~ CONCON_WAVE1 + CONFPN_WAVE1 + CONVAN_WAVE1 +  CONDAN_WAVE1'
+
+# Forces items to be on the same scale. Can be acheived one of two ways:
+
+# Fixed factor; constrains variance of latent factor to 1
+fixed<- cfa(Model1, std.lv=TRUE, data=PDS)
+summary(fixed, fit.measures= TRUE, standardized= TRUE)
+semPaths(fixed, what = "paths", whatLabels= "est", layout = "tree")
+
+# Marker variable; fixes first factor loading (CONCON_WAVE1) to 1
+marker<- cfa(Model1, data=PDS)
+summary (marker, fit.measures=TRUE, standardized= TRUE)
+semPaths(marker, what = "paths", whatLabels= "est", layout = "tree")
+
+# All parameters stay the same with the exception of latent variable and variances estimates, which is expected as constraints differ between models 
+```
+
+2) What do the fit statistics say about your latent variable? Good/bad? Is your latent variable Just identified/saturated, under identified or over identified?
+
+```{r setup, include=FALSE}
+# Absolute indexes of model fit compare the fit of your model to a perfect fitting model (two below)
+  # RMSEA= 0.034 # considered to be good fit
+  # SRMR= 0.041 # considered to be good fit
+
+# two below compare the fit of your model to the fit of the null model
+  # CFI= 0.982 # considered to be good fit
+  # TLI= 0.947 # considered to be good fit
+
+# df= knowns-knowns; DF=2. This would  suggest that the latent variable is overidentified and thus we are able to assess the fit of the model and estimate the unknown parameters. However, p value of chi square is not significant (p=0.329)
+
+
+```
+3) Fit a longitudinal CFA model where you a) first correlate your latent factors across time and then b) a second model that predicts later times by a prevous time (ie auto regressive; t1 -> t2 -> t3). What are your conclusions? How does one differ from the other?
+
+```{r setup, include=FALSE}
+Full.mod<- '
+Executive_network =~ CONCON_WAVE1 + CONFPN_WAVE1 + CONVAN_WAVE1 +  CONDAN_WAVE1
+Executive_network2 =~ CONCON_WAVE2 + CONFPN_WAVE2 + CONVAN_WAVE2 +  CONDAN_WAVE2
+Executive_network3 =~ CONCON_WAVE3 + CONFPN_WAVE3 + CONVAN_WAVE3 +  CONDAN_WAVE3
+'
+
+test<- cfa(Full.mod, data=PDS, std.lv=TRUE) 
+summary (test, fit.measures=TRUE, standardized= TRUE)
+semPaths(long_model, what = "paths", whatLabels= "est", layout = "tree")
+# am getting a warning signal ' model has not converged'
+
+aut0regressive<- 'Executive_network =~ CONCON_WAVE1 + CONFPN_WAVE1 + CONVAN_WAVE1 +  CONDAN_WAVE1
+Executive_network2 =~ CONCON_WAVE2 + CONFPN_WAVE2 + CONVAN_WAVE2 +  CONDAN_WAVE2
+Executive_network3 =~ CONCON_WAVE3 + CONFPN_WAVE3 + CONVAN_WAVE3 +  CONDAN_WAVE3
+Executive_network3 ~ Executive_network2
+Executive_network2 ~ Executive_network
+'
+
+autoreg<- cfa(aut0regressive, std.lv=TRUE, data=PDS) 
+summary (autoreg, fit.measures=TRUE, standardized= TRUE)
+semPaths(aut0regressive, what = "paths", whatLabels= "est", layout = "tree")
+
+### am getting a warning signal ' model has not converged'###
+
+
+```
+
+4) Fit a longitdinal growth model in SEM and in HLM. Compare and contrast the differences.
+
+Intercept between SEM and HLM were largely the same, slopes were similar as well. Introducing a random slope in HLM did not change these figures. 
+
+```{r setup, include=FALSE}
+  #prep data for HLM
+    PDS <- read.csv("~/Dropbox/3rd Fall/Longitudinal data analysis/PDS_II_LI_reduced_09_01_17.csv")
+    
+    ## renaming variables
+    PDS <- rename(PDS, c("Subid_fMRI"= "ID"))
+    PDS <- rename(PDS, c("CON_CON_WAVE1"= "CONCON_WAVE1"))
+    PDS <- rename(PDS, c("CON_CON_WAVE2"= "CONCON_WAVE2"))
+    PDS <- rename(PDS, c("CON_CON_WAVE3"= "CONCON_WAVE3"))
+    PDS <- rename(PDS, c("CON_FPN_WAVE1"= "CONFPN_WAVE1"))
+    PDS <- rename(PDS, c("CON_FPN_WAVE2"= "CONFPN_WAVE2"))
+    PDS <- rename(PDS, c("CON_FPN_WAVE3"= "CONFPN_WAVE3"))
+
+    ## randomly created DOB and added to dataframe
+    Agenow=sample(seq(as.Date('2000/01/01'), as.Date('2012/01/01'), by='day'), 136)
+    DOBDOB_WAVE1=Agenow
+    
+    #Centers age to be able to interpret 0
+    PDS1=PDS
+    Agecen_WAVE1= PDS$Ageage_WAVE1- mean(PDS1$Ageage_WAVE1)
+    Agecen_WAVE2= PDS$Ageage_WAVE2- mean(PDS1$Ageage_WAVE2, na.rm=TRUE)
+    Agecen_WAVE3= PDS$Ageage_WAVE3- mean(PDS1$Ageage_WAVE3)
+    PDS1=cbind(PDS, Agecen_WAVE1, Agecen_WAVE2, Agecen_WAVE3, DOBDOB_WAVE1)
+    ## converting to long format
+    wide_to_long_new <- PDS1 %>%
+    gather(-DOBDOB_WAVE1,-ID,-Sex, key = "Timepoint", value = "Value") %>%
+    separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
+    spread(key = var, value = Value)
+
+#HLM growth model random intercept; intercept=0.297126, slope= 0.003605
+HLM<- lmer(CONCON ~ Agecen+ (1|ID), data=wide_to_long_new)
+summary(HLM)
+
+# HML growth model with random slope; intecept= 0.296943, slope= 0.003162
+randomslope1= lmer(CONCON~ 1 + Agecen+ (Agecen | ID), data = wide_to_long_new)
+summary (randomslope1)
+
+# SEM growth model with 3 timepoints intercept=0.291 and slope=0.008 with fixed coefficients  
+growth.model<- ' i=~ 1*CONCON_WAVE1 + 1*CONCON_WAVE2 + 1*CONCON_WAVE3
+s=~ 0*CONCON_WAVE1 + 1*CONCON_WAVE2 + 2*CONCON_WAVE3'
+fit<- growth(growth.model, data = PDS)
+summary(fit)
+semPaths(fit, what = "paths", whatLabels= "est", layout = "tree")
+
+# Intercepts are nearly identical, HLM model has slightly smaller slope.
+```
+
+5) Constrain the residual variances to be equal. Does this change the fit of your model? Intercept= 0.291, Slope= 0.006, not much change.
+
+```{r setup, include=FALSE}
+constrain.var<- ' i=~ 1*CONCON_WAVE1 + 1*CONCON_WAVE2 + 1*CONCON_WAVE3
+s=~ 0*CONCON_WAVE1 + 1*CONCON_WAVE2 + 2*CONCON_WAVE3
+CONCON_WAVE1~~ a*CONCON_WAVE1
+CONCON_WAVE2~~ a*CONCON_WAVE2
+CONCON_WAVE3~~ a*CONCON_WAVE3
+'
+constrain.var1<- growth(constrain.var, missing= "ML", data = PDS)
+## error: lavaan WARNING: some estimated lv variances are negative ##
+summary(constrain.var1)
+semPaths(constrain.var1, what = "paths", whatLabels= "est", layout = "tree")
+```
+
+6) Contrain your slope to be fixed, not random. How does this change your model?
+
+```{r setup, include=FALSE}
+#HML growth model with fixed slope; intercept=  0.297126, slope= 0.003605
+
+fixed_slope1= lmer(CONCON ~ 1 + Agecen + (1 | ID), data = wide_to_long_new)
+summary(fixed_slope1)
+```
+
+7) Change the time metric in your SEM growth model. How does that change your estimates? Does it change your fit statistics?
+
+
+```{r setup, include=FALSE}
+```
+
+8) Try a different type of estimation (see lavaan tutorial for details). How does that change your model?
+
+```{r setup, include=FALSE}
+```
