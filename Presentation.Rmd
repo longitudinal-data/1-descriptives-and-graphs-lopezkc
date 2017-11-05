@@ -1,0 +1,83 @@
+---
+title: "Presentation"
+author: "Kat Lopez"
+date: "November 5, 2017"
+output: html_document
+---
+
+```{r}
+PDS_stats= read.csv("~/Dropbox/3rd Fall/Longitudinal data analysis/STATS_resting_state_BRIEF.csv")
+#this converts variables to numeric starting from column 4
+id <- c(1,4:ncol(PDS_stats))
+PDS_stats[,id] <- as.numeric(as.character(unlist(PDS_stats[,id])))
+library(lavaan)
+library(semTools)
+library(semPlot)
+library(lme4)
+library(tidyr)
+
+#convert variables
+PDS_stats$T3gecrs_combined_conv=PDS_stats$T3gecrs_Combined/100
+PDS_stats$T12gecrs_conv=PDS_stats$T12gecrs/100
+PDS_stats$T14gecrs_conv=PDS_stats$T14gecrs/100
+as.numeric(as.character(unlist(PDS_stats[,id])))
+```
+
+
+```{r}
+model.bi <- '
+#create global composite EF growth model
+    i.p =~ 1*T3gecrs_combined_conv + 1*T12gecrs_conv + 1*T14gecrs_conv 
+    s.p =~ 0*T3gecrs_combined_conv + 1*T12gecrs_conv + 2*T14gecrs_conv 
+
+#create Global efficiency growth model 
+    i.n =~ 1*S1_FPN_GE_K1to5 + 1*S2_FPN_GE_K1to5 + 1*S3_FPN_GE_K1to5 
+    s.n =~ 0*S1_FPN_GE_K1to5 + 1*S2_FPN_GE_K1to5 + 2*S3_FPN_GE_K1to5 
+'
+
+fit.bi <- growth(model.bi, data = PDS_stats)
+
+summary(fit.bi)
+```
+
+
+```{r}
+sec.order <- '
+###define latent variables
+EFT3 =~ NA*T3brirs + L1*T3brirs + L2*T3mirs 
+EFT12 =~ NA*T12brirs + L1*T12brirs + L2*T12mirs 
+EFT14=~ NA*T14brirs + L1*T14brirs + L2*T14mirs
+
+### intercepts
+T3brirs ~ t1*1
+T3mirs ~ t2*1
+
+T12brirs ~ t1*1
+T12mirs ~ t2*1
+
+T14brirs ~ t1*1
+T14mirs ~ t2*1
+
+## correlated residuals across time
+T3brirs ~~ T3mirs
+T12brirs ~~ T12mirs
+T14brirs ~~ T14mirs
+
+## latent variable intercepts
+EFT3 ~ 0*1
+EFT12 ~ 0*1
+EFT14 ~ 0*1
+
+#model constraints for effect coding
+## loadings must average to 1
+L1 == 2 - L2
+## means must average to 0
+t1 == 0 - t2
+
+i =~ 1*EFT3 + 1*EFT12 + 1*EFT14 
+s =~ 0*EFT3 + 1*EFT12 + 2*EFT14 '
+
+fit.sec.order <- growth(sec.order, data=PDS_stats, missing = "ML")
+summary(fit.sec.order, fit.measures=TRUE)
+```
+
