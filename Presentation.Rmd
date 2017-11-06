@@ -24,60 +24,160 @@ as.numeric(as.character(unlist(PDS_stats[,id])))
 ```
 
 
+
 ```{r}
-model.bi <- '
-#create global composite EF growth model
-    i.p =~ 1*T3gecrs_combined_conv + 1*T12gecrs_conv + 1*T14gecrs_conv 
-    s.p =~ 0*T3gecrs_combined_conv + 1*T12gecrs_conv + 2*T14gecrs_conv 
+# Univariate Growth Models
 
-#create Global efficiency growth model 
-    i.n =~ 1*S1_FPN_GE_K1to5 + 1*S2_FPN_GE_K1to5 + 1*S3_FPN_GE_K1to5 
-    s.n =~ 0*S1_FPN_GE_K1to5 + 1*S2_FPN_GE_K1to5 + 2*S3_FPN_GE_K1to5 
-'
+# Global Executive Composite raw scores
+# with intercept only 
+  Intercept.only= ' i=~ 1*T3gecrs_combined_conv + 1*T12gecrs_conv + 1*T14gecrs_conv' 
+  Intercept.only.fit= growth(Intercept.only, data = PDS_stats, missing= "ML")
+  summary (Intercept.only.fit)
+  semPaths(Intercept.only.fit, what = "paths", whatLabels= "est", layout = "tree")
 
-fit.bi <- growth(model.bi, data = PDS_stats)
 
-summary(fit.bi)
+# with a fixed slope
+  fixed.slope= ' i=~ 1*T3gecrs_combined_conv + 1*T12gecrs_conv + 1*T14gecrs_conv
+  s=~ 0*T3gecrs_combined_conv + 1*T12gecrs_conv + 2*T14gecrs_conv
+  s ~~ 0*s'  #fixes slope
+  fixed.slope.fit= growth(fixed.slope, data = PDS_stats, missing= "ML")
+  inspect(fixed.slope.fit, "cov.lv")
+  summary (fixed.slope.fit)
+  semPaths(fixed.slope.fit, what = "paths", whatLabels= "est", layout = "tree")
+  
+# with a random slope
+
+  random.intercept= ' i=~ 1*T3gecrs_combined_conv + 1*T12gecrs_conv + 1*T14gecrs_conv
+  s=~ -1*T3gecrs_combined_conv + 0*T12gecrs_conv + 1*T14gecrs_conv'
+  random.intercept.fit= growth(random.intercept, data = PDS_stats, missing= "ML")
+  summary (random.intercept.fit)
+  semPaths(random.intercept.fit, what = "paths", whatLabels= "est", layout = "tree")
+
+# compare models 
+  
+  anova(Intercept.only.fit, fixed.slope.fit)
+  anova(fixed.slope.fit, random.intercept.fit)
+  
+## Between network connectivity 
+
+  # with intercept only 
+  Intercept.only.network= ' i=~ 1*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 1*WAVE3_FPN_CON' 
+  Intercept.only.network.fit= growth(Intercept.only.network, data = PDS_stats, missing= "ML")
+  summary (Intercept.only.network.fit)
+  semPaths(Intercept.only.network.fit, what = "paths", whatLabels= "est", layout = "tree")
+
+
+# with a fixed slope
+  fixed.slope.network= ' i=~ 1*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 1*WAVE3_FPN_CON
+  s=~ 0*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 2*WAVE3_FPN_CON
+  s ~~ 0*s'  #fixes slope
+  fixed.slope.network.fit= growth(fixed.slope.network, data = PDS_stats, missing= "ML")
+  inspect(fixed.slope.network.fit, "cov.lv")
+  summary (fixed.slope.network.fit)
+  semPaths(fixed.slope.network.fit, what = "paths", whatLabels= "est", layout = "tree")
+  
+# with a random slope
+
+  random.intercept.network= ' i=~ 1*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 1*WAVE3_FPN_CON
+  s=~ -1*WAVE1_FPN_CON + 0*WAVE2_FPN_CON + 1*WAVE3_FPN_CON'
+  random.intercept.network.fit= growth(random.intercept.network, data = PDS_stats, missing= "ML")
+  summary (random.intercept.network.fit)
+  semPaths(random.intercept.network.fit, what = "paths", whatLabels= "est", layout = "tree")
+
+# compare models 
+  
+  anova(Intercept.only.network.fit, fixed.slope.network.fit)
+  anova(fixed.slope.network.fit, random.intercept.network.fit)
+  
+# Bivariate Growth Models
+  model.network.bi <- '
+  #create global composite EF growth model
+      i.p =~ 1*T3gecrs_combined_conv + 1*T12gecrs_conv + 1*T14gecrs_conv 
+      s.p =~ 0*T3gecrs_combined_conv + 1*T12gecrs_conv + 2*T14gecrs_conv 
+  
+  #create Global efficiency growth model 
+      i.n =~ 1*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 1*WAVE3_FPN_CON 
+      s.n =~ 0*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 2*WAVE3_FPN_CON'
+  
+  fit.network.bi <- growth(model.network.bi, data = PDS_stats, missing= "ML")
+  summary(fit.network.bi)
+  semPaths(fit.network.bi, what = "paths", whatLabels= "est", layout = "tree")
 ```
 
 
 ```{r}
+
+# MI: initiate, working memory, plan/organize, organization of material, monitor
+metacognition.index.T3= ' metacognition.index.T3 =~ T3initirs + T3wrkmrs + T3plorgrs +T3orgmars + T3monirs' 
+fit= cfa(metacognition.index.T3, data= PDS_stats, missing= "ML")
+summary(fit, fit.measures=TRUE)
+
+metacognition.index.T12= ' metacognition.index.T12 =~ T12initirs + T12wrkmrs + T12plorgrs +T12orgmars + T12monirs' 
+fit2= cfa(metacognition.index.T12, data= PDS_stats, missing= "ML")
+summary(fit2, fit.measures=TRUE)
+
+metacognition.index.T14= ' metacognition.index.T14 =~ T14initirs + T14wrkmrs + T14plorgrs +T14orgmars + T14monirs' 
+fit3= cfa(metacognition.index.T14, data= PDS_stats, missing= "ML")
+summary(fit3, fit.measures=TRUE)
+
+# Second 
 sec.order <- '
 ###define latent variables
-EFT3 =~ NA*T3brirs + L1*T3brirs + L2*T3mirs 
-EFT12 =~ NA*T12brirs + L1*T12brirs + L2*T12mirs 
-EFT14=~ NA*T14brirs + L1*T14brirs + L2*T14mirs
+MIT3 =~ NA*T3initirs + L1*T3initirs + L2*T3wrkmrs + L3*T3plorgrs + L4*T3orgmars + L5*T3monirs
+MIT12 =~ NA*T12initirs + L1*T12initirs + L2*T12wrkmrs + L3*T12plorgrs + L4*T12orgmars + L5*T12monirs
+MIT14=~ NA*T14initirs + L1*T14initirs + L2*T14wrkmrs + L3*T14plorgrs + L4*T14orgmars + L5*T14monirs
 
 ### intercepts
-T3brirs ~ t1*1
-T3mirs ~ t2*1
+T3initirs ~ t1*1
+T3wrkmrs ~ t2*1
+T3plorgrs ~ t3*1
+T3orgmars ~ t4*1
+T3monirs ~ t5*1
 
-T12brirs ~ t1*1
-T12mirs ~ t2*1
+T12initirs ~ t1*1
+T12wrkmrs ~ t2*1
+T12plorgrs ~ t3*1
+T12orgmars ~ t4*1
+T12monirs ~ t5*1
 
-T14brirs ~ t1*1
-T14mirs ~ t2*1
+T14initirs ~ t1*1
+T14wrkmrs ~ t2*1
+T14plorgrs ~ t3*1
+T14orgmars ~ t4*1
+T14monirs ~ t5*1
 
 ## correlated residuals across time
-T3brirs ~~ T3mirs
-T12brirs ~~ T12mirs
-T14brirs ~~ T14mirs
+T3initirs ~~ T3wrkmrs + T3plorgrs + T3orgmars + T3monirs
+T3wrkmrs ~~ T3plorgrs + T3orgmars + T3monirs
+T3plorgrs  ~~ T3orgmars + T3monirs
+T3orgmars  ~~ T3monirs
+
+T12initirs ~~ T12wrkmrs + T12plorgrs + T12orgmars + T12monirs
+T12wrkmrs ~~ T12plorgrs + T12orgmars + T12monirs
+T12plorgrs  ~~ T12orgmars + T12monirs
+T12orgmars  ~~ T12monirs
+
+T14initirs ~~ T14wrkmrs + T14plorgrs + T14orgmars + T14monirs
+T14wrkmrs ~~ T14plorgrs + T14orgmars + T14monirs
+T14plorgrs  ~~ T14orgmars + T14monirs
+T14orgmars  ~~ T14monirs
 
 ## latent variable intercepts
-EFT3 ~ 0*1
-EFT12 ~ 0*1
-EFT14 ~ 0*1
+MIT3 ~ 0*1
+MIT12 ~ 0*1
+MIT14 ~ 0*1
 
 #model constraints for effect coding
 ## loadings must average to 1
-L1 == 2 - L2
+L1 == 5 - L2 - L3 - L4 - L5
 ## means must average to 0
-t1 == 0 - t2
+t1 == 0 - t2 - t3 - t4 - t5
 
-i =~ 1*EFT3 + 1*EFT12 + 1*EFT14 
-s =~ 0*EFT3 + 1*EFT12 + 2*EFT14 '
+i =~ 1*MIT3 + 1*MIT12 + 1*MIT14 
+s =~ 0*MIT3 + 1*MIT12 + 2*MIT14'
 
-fit.sec.order <- growth(sec.order, data=PDS_stats, missing = "ML")
+fit.sec.order <- growth(sec.order, data=PDS_stats, missing= "ML")
 summary(fit.sec.order, fit.measures=TRUE)
+semPaths(fit.sec.order, what = "paths", whatLabels= "est", layout = "tree")
 ```
 
