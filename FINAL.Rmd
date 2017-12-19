@@ -1,0 +1,220 @@
+---
+title: "final project"
+author: "Kat Lopez"
+date: "December 10, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+semPaths(fit.network.bi, as.expression= "edges", whatLabels= "est", layout = "circle2", intercepts= FALSE, curvePivot = TRUE, what= "std", residuals= FALSE)
+
+
+```{r, echo=FALSE, message=F, warning=F, error=F, include=FALSE}
+PDS_stats= read.csv("~/Dropbox/3rd Fall/Longitudinal data analysis/STATS_resting_state_BRIEF.csv")
+#this converts variables to numeric starting from column 4
+id <- c(1,4:ncol(PDS_stats))
+PDS_stats[,id] <- as.numeric(as.character(unlist(PDS_stats[,id])))
+library(lavaan)
+library(semTools)
+library(semPlot)
+library(lme4)
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(plyr)
+```
+
+```{r Plotting trajectories for all variables}
+reduced1= data.frame(PDS_stats$Subid, PDS_stats$T3inhibrs, PDS_stats$T12inhibrs, PDS_stats$T14inhibrs, PDS_stats$WAVE1_FPN_CON, PDS_stats$WAVE2_FPN_CON, PDS_stats$WAVE3_FPN_CON,  PDS_stats$WAVE1_FPN_DMN, PDS_stats$WAVE2_FPN_DMN, PDS_stats$WAVE3_FPN_DMN)
+
+reduced1 <- rename(reduced1, c("PDS_stats.Subid"= "ID"))
+reduced1 <- rename(reduced1, c("PDS_stats.T3inhibrs"= "INHINH_WAVE1"))
+reduced1 <- rename(reduced1, c("PDS_stats.T12inhibrs"= "INHINH_WAVE2"))
+reduced1 <- rename(reduced1, c("PDS_stats.T14inhibrs"= "INHINH_WAVE3"))
+reduced1 <- rename(reduced1, c("PDS_stats.WAVE1_FPN_CON"= "FPNCON_WAVE1"))
+reduced1 <- rename(reduced1, c("PDS_stats.WAVE2_FPN_CON"= "FPNCON_WAVE2"))
+reduced1 <- rename(reduced1, c("PDS_stats.WAVE3_FPN_CON"= "FPNCON_WAVE3"))
+reduced1 <- rename(reduced1, c("PDS_stats.WAVE1_FPN_DMN"= "FPNDMN_WAVE1"))
+reduced1 <- rename(reduced1, c("PDS_stats.WAVE2_FPN_DMN"= "FPNDMN_WAVE2"))
+reduced1 <- rename(reduced1, c("PDS_stats.WAVE3_FPN_DMN"= "FPNDMN_WAVE3"))
+
+m<- reduced1 %>%
+gather(-ID, key = "Timepoint", value = "Value") %>%
+separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
+spread(key = var, value = Value)
+
+e1= ggplot(m, aes(x=wave, y=INHINH, group=ID)) + geom_point() +stat_smooth(method = "lm", se=FALSE)
+e2= e1 + stat_smooth(data =m, aes(x=wave, y=INHINH, group=1, colour="100"), method = "lm", size=1, se=FALSE) + labs(x= "", y= "Inhibit Scores")
+e2
+
+g1= ggplot(m, aes(x=wave, y=FPNCON, group=ID)) + geom_point() +stat_smooth(method = "lm", se=FALSE)
+g2= g1 + stat_smooth(data =m, aes(x=wave, y=FPNCON, group=1, colour="100"), method = "lm", size=1, se=FALSE) + labs(x= "Timepoint", y= "FPNCON")
+g2
+
+f1= ggplot(m, aes(x=wave, y=FPNDMN, group=ID)) + geom_point() +stat_smooth(method = "lm", se=FALSE)
+f2= f1 + stat_smooth(data =m, aes(x=wave, y=FPNDMN, group=1, colour="100"), method = "lm", size=1, se=FALSE) + labs(x= " ", y= "FPNDMN")
+f2
+
+
+library(ggplot2)
+library(grid)
+library(gridExtra)
+grid.arrange(e2, g2, f2, ncol=3)
+
+```
+
+```{r, echo=TRUE, warning=F, error=F}
+# Univariate Growth Models, then build up to Bivariate Growth Model
+# Inhibit raw scores
+# with intercept only 
+  Intercept.only= ' i=~ 1*T3inhibrs + 1*T12inhibrs + 1*T14inhibrs' 
+  Intercept.only.fit= growth(Intercept.only, data = PDS_stats, missing= "ML")
+  summary (Intercept.only.fit, fit.measures=TRUE, standardized=TRUE)
+
+
+# with a fixed slope
+  fixed.slope= ' i=~ 1*T3inhibrs + 1*T12inhibrs + 1*T14inhibrs
+  s=~ 1*T3inhibrs + 2*T12inhibrs + 3*T14inhibrs
+  s ~~ 0*s'  #fixes slope
+  fixed.slope.fit= growth(fixed.slope, data = PDS_stats, missing= "ML")
+  inspect(fixed.slope.fit, "cov.lv")
+  summary (fixed.slope.fit, fit.measures=TRUE, standardized=TRUE)
+
+# with a random slope
+  random.slope= ' i=~ 1*T3inhibrs + 1*T12inhibrs + 1*T14inhibrs
+  s=~ -1*T3inhibrs + 0*T12inhibrs + 1*T14inhibrs'
+  random.slope.fit= growth(random.slope, data = PDS_stats, missing= "ML")
+  summary (random.slope.fit, fit.measures=TRUE, standardized=TRUE)
+
+   
+  # compare models 
+  anova(Intercept.only.fit, fixed.slope.fit) 
+
+  anova(fixed.slope.fit, random.slope.fit) 
+  
+semPaths(random.slope.fit, as.expression= "edges", whatLabels= "est", layout = "tree", intercepts= TRUE, residuals= TRUE, nodeLabels = c("T1", "T2", "T3", "Intercept", "Slope", " ", " ", " ", " ", " "))
+
+```  
+  
+```{r, echo=TRUE, warning=F, error=F}  
+### Between Network connectivity 
+#FPNCON
+  # with intercept only 
+  Intercept.only.network= ' i=~ 1*WAVE1_CON_FPN + 1*WAVE2_CON_FPN + 1*WAVE3_CON_FPN' 
+  Intercept.only.network.fit= sem(Intercept.only.network, data = PDS_stats, missing= "ML")
+  summary (Intercept.only.network.fit, fit.measures=TRUE, standardized=TRUE)
+   
+
+  # with a fixed slope
+  fixed.slope.network= ' i=~ 1*WAVE1_CON_FPN + 1*WAVE2_CON_FPN + 1*WAVE3_CON_FPN
+  s=~ 0*WAVE1_CON_FPN + 1*WAVE2_CON_FPN + 2*WAVE3_CON_FPN
+  s ~~ 0*s'  #fixes slope
+  fixed.slope.network.fit= growth(fixed.slope.network, data = PDS_stats, missing= "ML")
+  inspect(fixed.slope.network.fit, "cov.lv")
+  summary (fixed.slope.network.fit, fit.measures=TRUE, standardized=TRUE)
+  
+
+# with a random slope
+  random.slope.network= ' i=~ 1*WAVE1_CON_FPN + 1*WAVE2_CON_FPN + 1*WAVE3_CON_FPN
+  s=~ 0*WAVE1_CON_FPN + 1*WAVE2_CON_FPN + 2*WAVE3_CON_FPN'
+  random.slope.network.fit= growth(random.slope.network, data = PDS_stats, missing= "ML")
+  summary (random.slope.network.fit, fit.measures=TRUE, standardized=TRUE)
+
+
+  # Compare models
+      anova(Intercept.only.network.fit, fixed.slope.network.fit) 
+
+      anova(fixed.slope.network.fit, random.slope.network.fit) 
+
+semPaths(random.slope.network.fit, as.expression= "edges", whatLabels= "est", layout = "tree", intercepts= TRUE, residuals= TRUE, nodeLabels = c("T1", "T2", "T3", "Intercept", "Slope", " ", " ", " ", " ", " "), curvePivot = TRUE, title=TRUE, sizeMan = 4, sizeInt = 2, sizeLat = 9, label.prop = .75, curve = 0.5, bg = "white")
+
+```
+
+
+```{r, echo=TRUE, warning=F, error=F}  
+### Between Network connectivity 
+#FPNCON
+
+  # with intercept only 
+  Intercept.only.network= ' i=~ 1*WAVE1_FPN_DMN + 1*WAVE2_FPN_DMN + 1*WAVE3_FPN_DMN' 
+  Intercept.only.network.fit= sem(Intercept.only.network, data = PDS_stats, missing= "ML")
+  summary (Intercept.only.network.fit, fit.measures=TRUE, standardized=TRUE)
+    
+  # with a fixed slope
+  fixed.slope.network= ' i=~ 1*WAVE1_FPN_DMN + 1*WAVE2_FPN_DMN + 1*WAVE3_FPN_DMN
+  s=~ 0*WAVE1_FPN_DMN + 1*WAVE2_FPN_DMN + 2*WAVE3_FPN_DMN
+  s ~~ 0*s'  #fixes slope
+  fixed.slope.network.fit= growth(fixed.slope.network, data = PDS_stats, missing= "ML")
+  inspect(fixed.slope.network.fit, "cov.lv")
+  summary (fixed.slope.network.fit, fit.measures=TRUE, standardized=TRUE)
+
+  # with a random slope
+  random.slope.network1= ' i=~ 1*WAVE1_FPN_DMN + 1*WAVE2_FPN_DMN + 1*WAVE3_FPN_DMN
+  s=~ 0*WAVE1_FPN_DMN + 1*WAVE2_FPN_DMN + 2*WAVE3_FPN_DMN'
+  random.slope.network.fit1= growth(random.slope.network1, data = PDS_stats, missing= "ML")
+  summary(random.slope.network.fit1, fit.measures=TRUE, standardized=TRUE)
+ 
+
+
+# Compare models
+      anova(Intercept.only.network.fit, fixed.slope.network.fit) 
+      anova(fixed.slope.network.fit, random.slope.network.fit) #no significant differences. 
+
+##plotting SEM   
+semPaths(random.slope.network.fit1, as.expression= "edges", whatLabels= "est", layout = "tree", intercepts= TRUE, residuals= FALSE, nodeLabels = c("T1", "T2", "T3", "Intercept", "Slope", " ", " ", " ", " ", " "), curvePivot = TRUE, edge.label.cex = 0.8, title=TRUE, sizeMan = 4, sizeInt = 2, sizeLat = 9, label.prop = .75, curve = 0.5, bg = "white") 
+
+```
+
+```{r}
+#Plots SEM of FPNCON and FPNDMN into one graph
+layout(t(1:2))
+semPaths(random.slope.network.fit,layout = "tree", nCharNodes = 4, nCharEdges = 3,  as.expression= "edges", residuals=FALSE, whatLabels= "est", title=FALSE, nodeLabels = c("T1", "T2", "T3", "Intercept", "Slope", " ", " ", " ", " ", " "), edge.label.cex = 2, label.prop = 2, curve = 0.5, rotation = 2, nDigits = 4) 
+title("FPN-CON Connectivity", line = 3)
+semPaths(random.slope.network.fit1,layout = "tree", nCharNodes = 4, nCharEdges = 3,  as.expression= "edges", residuals= FALSE, whatLabels= "est", title= FALSE, nodeLabels = c("T1", "T2", "T3", "Intercept", "Slope", " ", " ", " ", " ", " "), edge.label.cex = 2, label.prop = 2, curve = 0.5, rotation = 4, nDigits = 4)
+title("FPN-DMN Connectivity", line = 3)
+
+```
+
+```{r, echo=TRUE, warning=F, error=F} 
+# Bivariate Growth Models 
+# Inhibit and FPNCON
+
+  model.network.bi <- '
+  #create global composite EF growth model
+      Inhibit.i =~ 1*T3inhibrs + 1*T12inhibrs + 1*T14inhibrs 
+      Inhibit.s =~ 0*T3inhibrs + 1*T12inhibrs + 2*T14inhibrs 
+  
+  #create between network connectivity growth model 
+      FPNCON.i =~ 1*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 1*WAVE3_FPN_CON 
+      FPNCON.s=~ 0*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 2*WAVE3_FPN_CON'
+  
+  fit.network.bi <- growth(model.network.bi, data = PDS_stats, missing= "ML")
+  summary(fit.network.bi, fit.measures=TRUE, standardized=TRUE)
+  
+
+semPaths(fit.network.bi, layout = "tree2", as.expression= "edges", residuals=FALSE, whatLabels= "est", nodeLabels = c("T1", "T2", "T3", "T1", "T2", "T3", "Inhibit(i)", "Inhibit (s)", "FPNCON (i)", "FPNCON(s) ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " "), edge.label.cex = 1, label.prop = 1, curve = 3, rotation = 1, nDigits = 3, curvature = 1, nCharNodes = 3, nCharEdges = 4, sizeMan = 3, sizeLat = 8,  sizeInt =1 , cardinal = TRUE)
+
+#ndigit is not working??
+```
+
+```{r, echo=TRUE, warning=F, error=F} 
+# Bivariate Growth Models (does change in one latent variable correspond to change in another latent variable)
+  model.network.bi1 <- '
+  #create global composite EF growth model
+      i.inhibit =~ 1*T3inhibrs + 1*T12inhibrs + 1*T14inhibrs 
+      s.inhibit =~ 0*T3inhibrs + 1*T12inhibrs + 2*T14inhibrs 
+  
+  #create between network connectivity growth model 
+      i.fpndmn =~ 1*WAVE1_FPN_DMN + 1*WAVE2_FPN_DMN + 1*WAVE3_FPN_DMN 
+      s.fpndmn =~ 0*WAVE1_FPN_DMN + 1*WAVE2_FPN_DMN + 2*WAVE3_FPN_DMN'
+  
+  fit.network.bi1 <- growth(model.network.bi, data = PDS_stats, missing= "ML")
+  summary(fit.network.bi, fit.measures=TRUE, standardized=TRUE)
+  semPaths(fit.network.bi, what = "paths", whatLabels= "est", layout = "tree")
+
+  
+semPaths(fit.network.bi1, layout = "tree2", as.expression= "edges", residuals=FALSE, whatLabels= "est", nodeLabels = c("T1", "T2", "T3", "T1", "T2", "T3", "Inhibit(i)", "Inhibit (s)", "FPNDMN (i)", "FPNDMN(s) ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " "), edge.label.cex = 1, label.prop = 1, curve = 3, rotation = 1, nDigits = 3, curvature = 1, nCharNodes = 3, nCharEdges = 4, sizeMan = 3, sizeLat = 8,  sizeInt =1 , cardinal = TRUE)
+
+#for table
+m <- read.csv("~/Documents/GitHub/1-descriptives-and-graphs-lopezkc/Connectivity Project/m.csv")
+```
