@@ -3,95 +3,116 @@ title: "SEM"
 author: "Kat Lopez"
 date: "October 31, 2017"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
-```{r}
-PDS <- read.csv("~/Documents/GitHub/1-descriptives-and-graphs-lopezkc/Connectivity Project/PDS.csv")
-View(PDS)
+```{r, echo=FALSE, message=F, warning=F, error=F, include=FALSE}
+PDS_stats= read.csv("~/Dropbox/3rd Fall/Longitudinal data analysis/STATS_resting_state_BRIEF.csv")
+#this converts variables to numeric starting from column 4
+id <- c(1,4:ncol(PDS_stats))
+PDS_stats[,id] <- as.numeric(as.character(unlist(PDS_stats[,id])))
 library(lavaan)
 library(semTools)
-library("OpenMx", lib.loc="/Library/Frameworks/R.framework/Versions/3.4/Resources/library")
 library(semPlot)
 library(lme4)
-library(car)
 library(tidyr)
+library(ggplot2)
 
+#convert variables
+PDS_stats$T3gecrs_combined_conv=PDS_stats$T3gecrs_Combined/100
+PDS_stats$T12gecrs_conv=PDS_stats$T12gecrs/100
+PDS_stats$T14gecrs_conv=PDS_stats$T14gecrs/100
 ```
 
 1) Fit a measurement model to your constructs at one time point. Try out the different types of scaling discussed in class. What changes what stays the same?
 
-```{r setup, include=FALSE}
-
-Model1<- 'Executive_network=~ CONCON_WAVE1 + CONFPN_WAVE1 + CONVAN_WAVE1 +  CONDAN_WAVE1'
-
-# Forces items to be on the same scale. Can be acheived one of two ways:
-
-# Fixed factor; constrains variance of latent factor to 1
-fixed<- cfa(Model1, std.lv=TRUE, data=PDS)
+```{r, echo=TRUE, warning=F, error=F}
+metacognition.index.T3= ' metacognition.index.T3 =~ T3initirs + T3wrkmrs + T3plorgrs +T3orgmars + T3monirs' 
+# Fixed factor
+fixed<- cfa(metacognition.index.T3, missing= "ML", PDS_stats, std.lv = T)
 summary(fixed, fit.measures= TRUE, standardized= TRUE)
 semPaths(fixed, what = "paths", whatLabels= "est", layout = "tree")
 
-# Marker variable; fixes first factor loading (CONCON_WAVE1) to 1
-marker<- cfa(Model1, data=PDS)
+
+# Marker variable
+marker<- cfa(metacognition.index.T3, data=PDS_stats, missing= "ML")
 summary (marker, fit.measures=TRUE, standardized= TRUE)
 semPaths(marker, what = "paths", whatLabels= "est", layout = "tree")
 
-# All parameters stay the same with the exception of latent variable and variances estimates, which is expected as constraints differ between models 
+# all fit statistics are the same for both models
+#Comparative Fit Index (CFI)                    0.977
+#Tucker-Lewis Index (TLI)                       0.955
+#RMSEA                                          0.133
+#SRMR                                           0.026
+# All parameters stay the same with the exception of latent variable and variances estimates, which is expected as constraints differ between models-->  Fixed factor: constrains variance of latent factor to 1; Marker variable: fixes first factor loading to 1
 ```
 
 2) What do the fit statistics say about your latent variable? Good/bad? Is your latent variable Just identified/saturated, under identified or over identified?
 
-```{r setup, include=FALSE}
-# Absolute indexes of model fit compare the fit of your model to a perfect fitting model (two below)
-  # RMSEA= 0.034 # considered to be good fit
-  # SRMR= 0.041 # considered to be good fit
+RMSEA or SRMR; Above .10 poor fit Below .08 acceptable
+CFI, TFI; Usually >.9 is okay. Some care about > .95  
+```{r, echo=TRUE, warning=F, error=F}
+
+# All fit statistics (with the exception of RMSEA) suggest good fit of the latent variable
+#Comparative Fit Index (CFI)                    0.977
+#Tucker-Lewis Index (TLI)                       0.955
+#RMSEA                                          0.133
+#SRMR                                           0.026
 
 # two below compare the fit of your model to the fit of the null model
   # CFI= 0.982 # considered to be good fit
   # TLI= 0.947 # considered to be good fit
 
-# df= knowns-knowns; DF=2. This would  suggest that the latent variable is overidentified and thus we are able to assess the fit of the model and estimate the unknown parameters. However, p value of chi square is not significant (p=0.329)
-
-
+# df= knowns-knowns; DF=5. This would  suggest that the latent variable is overidentified and thus we are able to assess the fit of the model and estimate the unknown parameters. However, p value of chi square is barely significant (p=0.052)
 ```
+
 3) Fit a longitudinal CFA model where you a) first correlate your latent factors across time and then b) a second model that predicts later times by a prevous time (ie auto regressive; t1 -> t2 -> t3). What are your conclusions? How does one differ from the other?
 
-```{r setup, include=FALSE}
+```{r, echo=TRUE, warning=F, error=F}
 Full.mod<- '
-Executive_network =~ CONCON_WAVE1 + CONFPN_WAVE1 + CONVAN_WAVE1 +  CONDAN_WAVE1
-Executive_network2 =~ CONCON_WAVE2 + CONFPN_WAVE2 + CONVAN_WAVE2 +  CONDAN_WAVE2
-Executive_network3 =~ CONCON_WAVE3 + CONFPN_WAVE3 + CONVAN_WAVE3 +  CONDAN_WAVE3
+metacognition.index.T3 =~ T3initirs + T3wrkmrs + T3plorgrs +T3orgmars + T3monirs 
+metacognition.index.T12 =~ T12initirs + T12wrkmrs + T12plorgrs +T12orgmars + T12monirs 
+metacognition.index.T14 =~ T14initirs + T14wrkmrs + T14plorgrs +T14orgmars + T14monirs 
 '
 
-test<- cfa(Full.mod, data=PDS, std.lv=TRUE) 
+test<- cfa(Full.mod, data=PDS_stats, std.lv=TRUE, missing= "ML") 
 summary (test, fit.measures=TRUE, standardized= TRUE)
-semPaths(long_model, what = "paths", whatLabels= "est", layout = "tree")
-# am getting a warning signal ' model has not converged'
+semPaths(test, what = "paths", whatLabels= "est", layout = "tree")
+# Covariances indicate that my latent variable at time 3 is moderately correlated at time 12(0.598) and 14 (0.493), and that my latent variable at time 12 is highly correlated with time 14 (0.823). All covariances are significant 
 
-aut0regressive<- 'Executive_network =~ CONCON_WAVE1 + CONFPN_WAVE1 + CONVAN_WAVE1 +  CONDAN_WAVE1
-Executive_network2 =~ CONCON_WAVE2 + CONFPN_WAVE2 + CONVAN_WAVE2 +  CONDAN_WAVE2
-Executive_network3 =~ CONCON_WAVE3 + CONFPN_WAVE3 + CONVAN_WAVE3 +  CONDAN_WAVE3
-Executive_network3 ~ Executive_network2
-Executive_network2 ~ Executive_network
+aut0regressive<- '
+metacognition.index.T3 =~ T3initirs + T3wrkmrs + T3plorgrs +T3orgmars + T3monirs 
+metacognition.index.T12 =~ T12initirs + T12wrkmrs + T12plorgrs +T12orgmars + T12monirs 
+metacognition.index.T14 =~ T14initirs + T14wrkmrs + T14plorgrs +T14orgmars + T14monirs 
+metacognition.index.T14 ~ metacognition.index.T12
+metacognition.index.T12 ~ metacognition.index.T3
 '
 
-autoreg<- cfa(aut0regressive, std.lv=TRUE, data=PDS) 
+autoreg<- cfa(aut0regressive, std.lv=TRUE, data=PDS_stats, missing= "ML") 
 summary (autoreg, fit.measures=TRUE, standardized= TRUE)
-semPaths(aut0regressive, what = "paths", whatLabels= "est", layout = "tree")
+semPaths(autoreg, what = "paths", whatLabels= "est", layout = "tree")
+# Covariances:
+# metacognition.index.T3 ~~                                     
+#    mtcgntn.nd.T12              0.598    0.103    5.826    0.000
+#    mtcgntn.nd.T14              0.493    0.164    3.007    0.003
+# metacognition.index.T12 ~~                                    
+#    mtcgntn.nd.T14              0.823    0.039   20.903    0.000
 
-### am getting a warning signal ' model has not converged'###
+# Regressions
+# metacognition.index.T14 ~                                    
+#    mtcgntn.nd.T12             1.162    0.197    5.900    0.000
+#  metacognition.index.T12 ~                                    
+#    mtcgntn.ndx.T3             0.747    0.194    3.844    0.000
 
-
+# shows similar pattern; metacognition index at time 3 is highly related to time 12, which shows an even higher relationship to time 14. Greater relationship between 12 and 14 relative to the relationship between 3 and 12 may be due to the time interval between data acquisition (i.e. Time between  12 and 14 are closer in proximity)
 ```
 
 4) Fit a longitdinal growth model in SEM and in HLM. Compare and contrast the differences.
 
-Intercept between SEM and HLM were largely the same, slopes were similar as well. Introducing a random slope in HLM did not change these figures. 
-
-```{r setup, include=FALSE}
-  #prep data for HLM
+```{r, echo=TRUE, warning=F, error=F}
+#prep data for HLM
     PDS <- read.csv("~/Dropbox/3rd Fall/Longitudinal data analysis/PDS_II_LI_reduced_09_01_17.csv")
+library(plyr)
     
     ## renaming variables
     PDS <- rename(PDS, c("Subid_fMRI"= "ID"))
@@ -118,55 +139,88 @@ Intercept between SEM and HLM were largely the same, slopes were similar as well
     separate(Timepoint, into = c("var", "omit", "wave"), sep = c(6, 11)) %>%
     spread(key = var, value = Value)
 
-#HLM growth model random intercept; intercept=0.297126, slope= 0.003605
-HLM<- lmer(CONCON ~ Agecen+ (1|ID), data=wide_to_long_new)
+#HLM growth model fixed slope; intercept=-0.029438, slope= -0.002792
+HLM<- lmer(CONFPN ~ Agecen+ (1|ID), data=wide_to_long_new)
 summary(HLM)
+#HLM growth model random slope; intercept=-0.029639, slope= -0.002333
+HLM2<- lmer(CONFPN ~ Agecen+ (Agecen|ID), data=wide_to_long_new)
+summary(HLM2)
+anova(HLM, HLM2)
+# BIC is smaller in HLM model using fixed slope but not by much. Additionally, P was not significant. This would suggest that adding a random slope does not add to the model. 
 
-# HML growth model with random slope; intecept= 0.296943, slope= 0.003162
-randomslope1= lmer(CONCON~ 1 + Agecen+ (Agecen | ID), data = wide_to_long_new)
-summary (randomslope1)
+# SEM growth model with 3 timepoints intercept=-0.030 and slope=0.001 with fixed coefficients  
+# with a fixed slope
+  fixed.slope.network= ' i=~ 1*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 1*WAVE3_FPN_CON
+  s=~ 0*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 2*WAVE3_FPN_CON
+  s ~~ 0*s'  #fixes slope
+  fixed.slope.network.fit= growth(fixed.slope.network, data = PDS_stats, missing= "ML")
+  inspect(fixed.slope.network.fit, "cov.lv")
+  summary (fixed.slope.network.fit, fit.measures=TRUE, standardized=TRUE)
+  # intercept= -0.030, slope= 0.001
+  # RMSEA= 0.000; SRMR= 0.021, both suggesting acceptable fits
+  # CFI= 1.000; TFI= 1.130, suggesting larger distance from the worse fit (null), larger distance than intercept only
+  semPaths(fixed.slope.network.fit, what = "paths", whatLabels= "est", layout = "tree")
+      # Intercepts are nearly identical, HLM model has slightly smaller & negative slope.
+      # Overall, Intercept between SEM and HLM were largely the same, slopes were similar as well. 
+# with a random slope
+  random.slope.network= ' i=~ 1*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 1*WAVE3_FPN_CON
+  s=~ 0*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 2*WAVE3_FPN_CON'
+  random.slope.network.fit= growth(random.slope.network, data = PDS_stats, missing= "ML")
+  summary (random.slope.network.fit, fit.measures=TRUE, standardized=TRUE)
+  # Intercept and slope were exactly the same as the fixed.slope.network.fit. This suggest that introducing a random slope in HLM did not change these figures. There was also no significant differences between HLM and SEM in fitting a random slope
+  # RMSEA= 0.000; SRMR= 0.019, suggesting acceptable fits
+  # CFI= 1.000; TFI= 1.079, suggesting larger distance from the worse fit (null), although slightly smaller distance than fixed slope
+  semPaths(random.slope.network.fit, what = "paths", whatLabels= "est", layout = "tree")
 
-# SEM growth model with 3 timepoints intercept=0.291 and slope=0.008 with fixed coefficients  
-growth.model<- ' i=~ 1*CONCON_WAVE1 + 1*CONCON_WAVE2 + 1*CONCON_WAVE3
-s=~ 0*CONCON_WAVE1 + 1*CONCON_WAVE2 + 2*CONCON_WAVE3'
-fit<- growth(growth.model, data = PDS)
-summary(fit)
-semPaths(fit, what = "paths", whatLabels= "est", layout = "tree")
-
-# Intercepts are nearly identical, HLM model has slightly smaller slope.
+  
+# compare models 
+  anova(fixed.slope.network.fit, random.slope.network.fit) #no significant differences, adding a random slope does not benefit the model (just like in SEM)
+  
+# Take away: Children average starting value for FPNCON connectivity is different from zero (negative) but do not show significant differences in starting point and change over time
 ```
 
-5) Constrain the residual variances to be equal. Does this change the fit of your model? Intercept= 0.291, Slope= 0.006, not much change.
+5) Constrain the residual variances to be equal. Does this change the fit of your model? 
 
-```{r setup, include=FALSE}
-constrain.var<- ' i=~ 1*CONCON_WAVE1 + 1*CONCON_WAVE2 + 1*CONCON_WAVE3
-s=~ 0*CONCON_WAVE1 + 1*CONCON_WAVE2 + 2*CONCON_WAVE3
-CONCON_WAVE1~~ a*CONCON_WAVE1
-CONCON_WAVE2~~ a*CONCON_WAVE2
-CONCON_WAVE3~~ a*CONCON_WAVE3
+```{r, echo=TRUE, warning=F, error=F}
+constrain.var<- ' i=~ 1*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 1*WAVE3_FPN_CON
+s=~ 0*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 2*WAVE3_FPN_CON
+WAVE1_FPN_CON~~ a*WAVE1_FPN_CON
+WAVE2_FPN_CON~~ a*WAVE2_FPN_CON
+WAVE3_FPN_CON~~ a*WAVE3_FPN_CON
 '
-constrain.var1<- growth(constrain.var, missing= "ML", data = PDS)
-## error: lavaan WARNING: some estimated lv variances are negative ##
-summary(constrain.var1)
+constrain.var1<- growth(constrain.var, missing= "ML", data = PDS_stats)
+summary(constrain.var1, fit.measures=TRUE, standardized=TRUE)
+# Constraining the residual variances improves the fit statistics (RMSEA & SRMR) but lowers others (CFI & TFI). Overall, there is no remarkable change
+# RMSEA= 0.021; SRMR= 0.069, suggesting acceptable fits
+  # CFI= 0.985; TFI= 0.985, suggesting larger distance from the worse fit (null)
 semPaths(constrain.var1, what = "paths", whatLabels= "est", layout = "tree")
 ```
 
 6) Contrain your slope to be fixed, not random. How does this change your model?
 
-```{r setup, include=FALSE}
-#HML growth model with fixed slope; intercept=  0.297126, slope= 0.003605
-
-fixed_slope1= lmer(CONCON ~ 1 + Agecen + (1 | ID), data = wide_to_long_new)
-summary(fixed_slope1)
-```
-
-7) Change the time metric in your SEM growth model. How does that change your estimates? Does it change your fit statistics?
-
-
-```{r setup, include=FALSE}
+```{r, echo=TRUE, warning=F, error=F}
+ fixed.slope.network= ' i=~ 1*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 1*WAVE3_FPN_CON
+  s=~ 0*WAVE1_FPN_CON + 1*WAVE2_FPN_CON + 2*WAVE3_FPN_CON
+  s ~~ 0*s'  #fixes slope
+  fixed.slope.network.fit= growth(fixed.slope.network, data = PDS_stats, missing= "ML")
+  inspect(fixed.slope.network.fit, "cov.lv")
+  summary (fixed.slope.network.fit, fit.measures=TRUE, standardized=TRUE)
+  
+# compare models 
+anova(fixed.slope.network.fit, random.slope.network.fit) 
+# constraining the slope does not significantly change my model  p=0.8194
 ```
 
 8) Try a different type of estimation (see lavaan tutorial for details). How does that change your model?
 
-```{r setup, include=FALSE}
+```{r, echo=TRUE, warning=F, error=F}
+fixed.slope.network.fit= growth(fixed.slope.network, data = PDS_stats, missing= "ML")
+  inspect(fixed.slope.network.fit, "cov.lv")
+  summary (fixed.slope.network.fit, fit.measures=TRUE, standardized=TRUE)
+  
+#"MLMVS": maximum likelihood estimation with robust standard errors and a mean- and variance adjusted test statistic (aka the Satterthwaite approach). For complete data only.
+  fixed.slope.network.fit2= growth(fixed.slope.network,  estimator = "MLMVS", data = PDS_stats, missing= "ML")
+  inspect(fixed.slope.network.fit2, "cov.lv")
+  summary (fixed.slope.network.fit2, fit.measures=TRUE, standardized=TRUE)
+  #First, it used only reduced my numbers of observations by half- n=74 reflects completed data at all time points. My fit statistics, intercept, and slope do not change very much. Residual cariance for  .WAVE1_FPN_CON changes slightly. Loglikelihood decreases by half from 630 to 359.340
 ```
